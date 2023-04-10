@@ -1,0 +1,4 @@
+# develop
+.hypothesis
+.devcontainer/
+**/.devcontainer.json

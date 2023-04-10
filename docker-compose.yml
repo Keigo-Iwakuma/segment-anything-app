@@ -10,3 +10,43 @@ services:
       - ./frontend:/home/node/app/
     ports:
       - 5173:5173
+    links:
+      - backend
+
+  backend:
+    container_name: fastapi
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    tty: true
+    volumes:
+      - ./backend:/usr/src/app/
+    ports:
+      - 8000:8000
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 16G
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
+              count: 1
+    depends_on:
+      - db
+
+  db:
+    container_name: postgres
+    image: postgres:13.2
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - 5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
