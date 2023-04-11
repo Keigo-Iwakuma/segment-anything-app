@@ -80,6 +80,28 @@ def window_partition(x: torch.Tensor, window_size: int) -> Tuple[torch.Tensor, T
     return windows, (Hp, Wp)
 
 
+def window_unpartition(
+    windows: torch.Tensor, window_size: int, pad_hw: Tuple[int, int], hw: Tuple[int, int]
+) -> torch.Tensor:
+    """
+    Window unpartition into original sequence and removing padding
+    Args:
+        windows (torch.Tensor): windows after partition with shape (num_windows*B, window_size, window_size, C)
+        window_size (int): window size
+        pad_hw (tuple[int]): height and width of padding (Hp, Wp)
+        hw (tuple[int]): height and width of original sequence (H, W)
+    """
+    Hp, Wp = pad_hw
+    H, W = hw
+    B = windows.shape[0] // (Hp // window_size * Wp // window_size)
+    x = windows.view(B, Hp // window_size, Wp // window_size, window_size, window_size, -1)
+    x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, Hp, Wp, -1)
+
+    if Hp > H or Wp > W:
+        x = x[:, :H, :W, :].contiguous()
+    return x
+
+
 def get_rel_pos(
     q_size: int,
     k_size: int,
