@@ -53,6 +53,32 @@ class ImageEncoderVit(nn.Module):
 
         self.patch_embed = PatchEmbed
 
+    # qkv with shape (3, B, nHead, H * W, C)
+
+
+def window_partition(x: torch.Tensor, window_size: int) -> Tuple[torch.Tensor, Tuple[int, int]]:
+    """
+    Partition into non-overlapping windows with padding if needed
+    Args:
+        x (torch.Tensor): input tokens with shape (B, C, H, W)
+        window_size (int): window size
+    
+    Returns:
+        windows: windows after partition with shape (num_windows*B, C, window_size, window_size)
+        (Hp, Wp): padded height and width before partition
+    """
+    B, H, W, C = x.shape
+
+    pad_h = (window_size - H % window_size) % window_size
+    pad_w = (window_size - W % window_size) % window_size
+    if pad_h > 0 or pad_w > 0:
+        x = F.pad(x, (0, 0, 0, pad_h, 0, pad_w))
+    Hp, Wp = H + pad_h, W + pad_w
+
+    x = x.view(B, Hp // window_size, window_size, Wp // window_size, window_size, C)
+    windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, window_size, window_size, C)
+    return windows, (Hp, Wp)
+
 
 def get_rel_pos(
     q_size: int,
@@ -88,6 +114,46 @@ def get_rel_pos(
     relative_coords = (q_coords + k_coords) + (k_size - 1) * max(q_size / k_size, 1.)
 
     return rel_pos_resized[relative_coords.long()]
+
+
+def add_decomposed_rel_pos(
+    attn: torch.Tensor,
+    q: torch.Tensor,
+    rel_pos_h: torch.Tensor,
+    rel_pos_w: torch.Tensor,
+    q_size: Tuple[int, int],
+    k_size: Tuple[int, int],
+) -> torch.Tensor:
+    """
+    Calculate decomposed relative positional embeddings from :paper:`mvitv2`.
+    https://github.com/facebookresearch/mvit/blob/19786631e330df9f3622e5402b4a419a263a2c80/mvit/models/attention.py   # noqa B950
+
+    Args:
+        attn (torch.Tensor): attention map
+        q (torch.Tensor): query q in the attention layer with shape (B, q_h * q_w, C)
+        rel_pos_h (torch.Tensor): relative position embedding (Lh, C) for height axis
+        rel_pos_w (torch.Tensor): relative position embedding (Lw, C) for width axis
+        q_size (tuple[int]): spatial sequence size of query q with (q_h, q_w)
+        k_size (tuple[int]): spatial sequence size of key k with (k_h, k_w)
+    
+    Returns:
+        attn (torch.Tensor): attention map with added relative positional embeddings
+    """
+    q_h, q_w = q_size
+    k_h, k_w = k_size
+    Rh = get_rel_pos(q_h, k_h, rel_pos_h)
+    Rw = get_rel_pos(q_w, k_w, rel_pos_w)
+
+    B, _, dim = q.shape
+    r_q = q.reshape(B, q_h, q_w, dim)
+    rel_h = torch.einsum("bhwc,hkc->bhwk", r_q, Rh)
+    rel_w = torch.einsum("bhwc,wkc->bhwk", r_q, Rw)
+
+    attn = (
+        attn.view(B, q_h, q_w, k_h, k_w) + rel_h[:, :, :, :, None] + rel_w[:, :, :, None, :]
+    ).view(B, q_h * q_w, k_h * k_w)
+
+    return attn
 
 
 class PatchEmbed(nn.Module):
