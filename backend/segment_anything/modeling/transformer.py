@@ -14,6 +14,33 @@ class TwoWayTransformer(nn.Module):
         pass
 
 
+class TwoWayAttetionBlock(nn.Module):
+    def __init__(
+        self,
+        embedding_dim: int,
+        num_heads: int,
+        mlp_dim: int = 2048,
+        activation: Type[nn.Module] = nn.ReLU,
+        attention_downsample_rate: int = 2,
+        skip_first_layer_pe: bool = False,
+    ) -> None:
+        """
+        A transformer block with four layers: (1) self-attention of sparse
+        inputs, (2) cross-attention of sparse inputs to dense inputs, (3) mlp
+        block on sparse inputs, and (4) cross-attention of dense inputs to sparse inputs.
+
+        Args:
+            embedding_dim: The embedding dimension of the inputs.
+            num_heads: The number of attention heads.
+            mlp_dim: The dimension of the mlp block.
+            activation: The activation function to use in the mlp block.
+            attention_downsample_rate: The rate at which to downsample the
+                embedding dimension of the attention layers.
+            skip_first_layer_pe: Whether to skip positional encoding on the
+                first layer.
+        """
+
+
 class Attention(nn.Module):
     """
     An attention layer that allows for downscaling the size of embedding
