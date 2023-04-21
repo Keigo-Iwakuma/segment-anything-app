@@ -39,6 +39,24 @@ class TwoWayAttetionBlock(nn.Module):
             skip_first_layer_pe: Whether to skip positional encoding on the
                 first layer.
         """
+        super().__init__()
+        self.self_attn = Attention(embedding_dim, num_head)
+        self.norm1 = nn.LayerNorm(embedding_dim)
+
+        self.cross_attn_token_to_image = Attention(
+            embedding_dim, num_heads, attention_downsample_rate
+        )
+        self.norm2 = nn.LayerNorm(embedding_dim)
+
+        self.mlp = MLPBlock(embedding_dim, mlp_dim, activation)
+        self.norm3 = nn.LayerNorm(embedding_dim)
+
+        self.norm4 = nn.LayerNorm(embedding_dim)
+        self.cross_attn_image_to_token = Attention(
+            embedding_dim, num_heads, attention_downsample_rate
+        )
+
+        self.skip_first_layer_pe = skip_first_layer_pe
 
 
 class Attention(nn.Module):
