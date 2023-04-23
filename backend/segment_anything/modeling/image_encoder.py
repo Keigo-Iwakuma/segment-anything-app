@@ -9,7 +9,7 @@ from .common import LayerNorm2d, MLPBlock
 
 # This class and its supporting fuctions below lightly adapted from the VitDet backbone available at: # noqa
 # https://github.com/facebookresearch/detectron2/blob/main/detectron2/modeling/backbone/vit.py # noqa
-class ImageEncoderVit(nn.Module):
+class ImageEncoderViT(nn.Module):
     def __init__(
         self,
         img_size: int = 1024,
